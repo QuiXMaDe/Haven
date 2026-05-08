@@ -603,34 +603,40 @@ module.exports = function register(socket, ctx) {
     }
 
     // ── Persona detection (#86, #5349) ────────────────────
-    // Pattern: "::PersonaName actual message body" (colon optional after the
-    // name). The leading "::" is a deliberate, unambiguous trigger that does
-    // not conflict with any markdown syntax (unlike ">>", which the markdown
-    // renderer would turn into a nested blockquote). Persona names match
-    // against the sender's own user_personas (case-insensitive). When a
-    // match is found we strip the prefix from the stored content and stamp
-    // persona_id / persona_username / persona_avatar so the outgoing message
-    // displays as the persona while the real user_id (and therefore
-    // moderation) remains intact.
+    // Pattern: "::PersonaName actual message body"
+    // The leading "::" is a deliberate, unambiguous trigger that does not
+    // conflict with any markdown syntax. We iterate over the sender's own
+    // personas (longest name first to handle prefix ambiguity) and do a
+    // case-insensitive prefix match — this correctly handles persona names
+    // that contain spaces, which a single regex with [^\s] cannot do.
     let personaId = null;
     let personaUsername = null;
     let personaAvatar = null;
     let finalContent = safeContent;
-    {
-      const m = safeContent.match(/^::\s*([^\s:][^\s:]{0,31}):?\s+([\s\S]+)$/);
-      if (m) {
-        const candidate = m[1].trim();
-        const body = m[2];
-        if (candidate && body && body.trim().length > 0) {
-          const persona = db.prepare(
-            'SELECT id, name, avatar FROM user_personas WHERE user_id = ? AND name = ? COLLATE NOCASE'
-          ).get(socket.user.id, candidate);
-          if (persona) {
-            personaId = persona.id;
-            personaUsername = persona.name;
-            personaAvatar = persona.avatar || null;
-            finalContent = body.trim();
-          }
+    if (safeContent.startsWith('::')) {
+      const userPersonas = db.prepare(
+        'SELECT id, name, avatar FROM user_personas WHERE user_id = ?'
+      ).all(socket.user.id);
+      // Sort longest name first to prefer the most specific match.
+      userPersonas.sort((a, b) => b.name.length - a.name.length);
+      const lower = safeContent.toLowerCase();
+      for (const persona of userPersonas) {
+        // Allow "::Name message" (space separator) or "::Name: message" (colon+space)
+        const base = '::' + persona.name.toLowerCase();
+        let body = null;
+        if (lower.startsWith(base + ' ')) {
+          body = safeContent.slice(base.length + 1).trim();
+        } else if (lower.startsWith(base + ': ')) {
+          body = safeContent.slice(base.length + 2).trim();
+        } else if (lower.startsWith(base + ':') && safeContent.length > base.length + 1) {
+          body = safeContent.slice(base.length + 1).trim();
+        }
+        if (body && body.length > 0) {
+          personaId = persona.id;
+          personaUsername = persona.name;
+          personaAvatar = persona.avatar || null;
+          finalContent = body;
+          break;
         }
       }
     }
