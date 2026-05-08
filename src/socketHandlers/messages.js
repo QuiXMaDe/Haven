@@ -31,16 +31,18 @@ module.exports = function register(socket, ctx) {
     let messages;
     if (before) {
       messages = db.prepare(`
-        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at,
-               COALESCE(m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
+        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at, m.persona_id, m.persona_username, m.persona_avatar,
+               COALESCE(u.display_name, u.username, '[Deleted User]') as real_username,
+               COALESCE(m.persona_username, m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
         FROM messages m LEFT JOIN users u ON m.user_id = u.id
         WHERE m.channel_id = ? AND m.id < ? AND m.thread_id IS NULL
         ORDER BY m.created_at DESC, m.id DESC LIMIT ?
       `).all(channel.id, before, limit);
     } else if (after) {
       messages = db.prepare(`
-        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at,
-               COALESCE(m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
+        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at, m.persona_id, m.persona_username, m.persona_avatar,
+               COALESCE(u.display_name, u.username, '[Deleted User]') as real_username,
+               COALESCE(m.persona_username, m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
         FROM messages m LEFT JOIN users u ON m.user_id = u.id
         WHERE m.channel_id = ? AND m.id > ? AND m.thread_id IS NULL
         ORDER BY m.created_at ASC, m.id ASC LIMIT ?
@@ -48,21 +50,24 @@ module.exports = function register(socket, ctx) {
     } else if (around) {
       const half = Math.floor(limit / 2);
       const beforeMsgs = db.prepare(`
-        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at,
-               COALESCE(m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
+        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at, m.persona_id, m.persona_username, m.persona_avatar,
+               COALESCE(u.display_name, u.username, '[Deleted User]') as real_username,
+               COALESCE(m.persona_username, m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
         FROM messages m LEFT JOIN users u ON m.user_id = u.id
         WHERE m.channel_id = ? AND m.id < ? AND m.thread_id IS NULL
         ORDER BY m.created_at DESC, m.id DESC LIMIT ?
       `).all(channel.id, around, half);
       const targetMsg = db.prepare(`
-        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at,
-               COALESCE(m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
+        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at, m.persona_id, m.persona_username, m.persona_avatar,
+               COALESCE(u.display_name, u.username, '[Deleted User]') as real_username,
+               COALESCE(m.persona_username, m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
         FROM messages m LEFT JOIN users u ON m.user_id = u.id
         WHERE m.channel_id = ? AND m.id = ?
       `).all(channel.id, around);
       const afterMsgs = db.prepare(`
-        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at,
-               COALESCE(m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
+        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at, m.persona_id, m.persona_username, m.persona_avatar,
+               COALESCE(u.display_name, u.username, '[Deleted User]') as real_username,
+               COALESCE(m.persona_username, m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
         FROM messages m LEFT JOIN users u ON m.user_id = u.id
         WHERE m.channel_id = ? AND m.id > ? AND m.thread_id IS NULL
         ORDER BY m.created_at ASC, m.id ASC LIMIT ?
@@ -71,8 +76,9 @@ module.exports = function register(socket, ctx) {
       messages = [...beforeMsgs.reverse(), ...targetMsg, ...afterMsgs];
     } else {
       messages = db.prepare(`
-        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at,
-               COALESCE(m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
+        SELECT m.id, m.content, m.created_at, m.reply_to, m.edited_at, m.is_webhook, m.webhook_username, m.webhook_avatar, m.imported_from, m.is_archived, m.poll_data, m.burn_seconds, m.burning_started_at, m.persona_id, m.persona_username, m.persona_avatar,
+               COALESCE(u.display_name, u.username, '[Deleted User]') as real_username,
+               COALESCE(m.persona_username, m.webhook_username, u.display_name, u.username, '[Deleted User]') as username, u.id as user_id, u.avatar, COALESCE(u.avatar_shape, 'circle') as avatar_shape
         FROM messages m LEFT JOIN users u ON m.user_id = u.id
         WHERE m.channel_id = ? AND m.thread_id IS NULL
         ORDER BY m.created_at DESC, m.id DESC LIMIT ?
@@ -203,6 +209,20 @@ module.exports = function register(socket, ctx) {
         obj.imported_from = m.imported_from;
         obj.username = m.webhook_username || 'Unknown';
       }
+      // ── Persona override (#86, #5349) ──
+      // Persona display always wins over the real user's avatar/name
+      // (it loses to webhook/imported because those represent different
+      // message types entirely). The real_username field is preserved so
+      // the client can show a "@real_username" hint to mods/owner.
+      if (m.persona_id && !m.is_webhook && !m.imported_from) {
+        obj.persona_id = m.persona_id;
+        obj.persona_username = m.persona_username || null;
+        obj.persona_avatar = m.persona_avatar || null;
+        obj.real_username = m.real_username;
+        obj.username = m.persona_username || m.real_username || obj.username;
+        obj.avatar = m.persona_avatar || null;
+        obj.avatar_shape = 'circle';
+      }
       return obj;
     });
 
@@ -313,6 +333,125 @@ module.exports = function register(socket, ctx) {
       if (r.created_at && !r.created_at.endsWith('Z')) r.created_at = utcStamp(r.created_at);
     });
     socket.emit('search-results', { results, query: data.query, filters });
+  });
+
+  // ── Channel media gallery (#5350) ───────────────────────
+  // Returns categorized media + links from all messages in a channel.
+  // Photos / videos / audio / files come from /uploads/ URLs and the
+  // [file:name](/uploads/path) markdown wrapper. Links are http(s)://
+  // URLs in message bodies that don't point at /uploads/.
+  socket.on('get-channel-media', (data) => {
+    if (!data || typeof data !== 'object') return;
+    const code = typeof data.code === 'string' ? data.code.trim() : '';
+    if (!code || !/^[a-f0-9]{8}$/i.test(code)) return;
+
+    const channel = db.prepare('SELECT id FROM channels WHERE code = ?').get(code);
+    if (!channel) return;
+
+    const member = db.prepare(
+      'SELECT 1 FROM channel_members WHERE channel_id = ? AND user_id = ?'
+    ).get(channel.id, socket.user.id);
+    if (!member && !socket.user.isAdmin) {
+      return socket.emit('error-msg', 'Not a member of this channel');
+    }
+
+    // Pull every message in this channel that mentions /uploads/ or http(s)://
+    // Cap at 5000 to avoid pathological loads on giant channels.
+    const rows = db.prepare(`
+      SELECT m.id, m.content, m.created_at, m.original_name,
+             m.persona_id, m.persona_username, m.persona_avatar,
+             COALESCE(m.persona_username, m.webhook_username, u.display_name, u.username, '[Deleted User]') as username,
+             u.id as user_id
+      FROM messages m LEFT JOIN users u ON m.user_id = u.id
+      WHERE m.channel_id = ?
+        AND m.thread_id IS NULL
+        AND (m.content LIKE '%/uploads/%' ESCAPE '\\' OR m.content LIKE '%http://%' ESCAPE '\\' OR m.content LIKE '%https://%' ESCAPE '\\')
+      ORDER BY m.created_at DESC, m.id DESC
+      LIMIT 5000
+    `).all(channel.id);
+
+    const photos = [];
+    const videos = [];
+    const audios = [];
+    const files  = [];
+    const links  = [];
+
+    const IMG_EXT = /\.(jpe?g|png|gif|webp|bmp|svg|avif)(?:$|[?#])/i;
+    const VID_EXT = /\.(mp4|webm|mov|m4v|mkv|ogv)(?:$|[?#])/i;
+    const AUD_EXT = /\.(mp3|wav|ogg|m4a|flac|aac|opus|weba)(?:$|[?#])/i;
+
+    // [file:Original Name](/uploads/...) markdown wrapper
+    const fileLinkRe = /\[file:([^\]]+)\]\((\/uploads\/[^)\s]+)\)/g;
+    // bare /uploads/ URL (image markdown ![alt](/uploads/x) or plain path)
+    const uploadRe   = /(?:!\[[^\]]*\]\(([^)\s]+)\)|(\/uploads\/[^\s)]+))/g;
+    // http(s):// URLs (anywhere in content)
+    const httpRe     = /(https?:\/\/[^\s<>"']+)/gi;
+
+    for (const row of rows) {
+      const ts = row.created_at && !row.created_at.endsWith('Z') ? utcStamp(row.created_at) : row.created_at;
+      const seen = new Set(); // dedupe URLs within a single message
+      const baseEntry = (url, name) => ({
+        message_id: row.id,
+        url,
+        name: name || row.original_name || url.split('/').pop(),
+        created_at: ts,
+        username: row.username,
+        user_id: row.user_id,
+      });
+
+      // 1) [file:name](url) wrappers
+      let m;
+      const content = row.content || '';
+      while ((m = fileLinkRe.exec(content)) !== null) {
+        const name = m[1];
+        const url  = m[2];
+        if (seen.has(url)) continue;
+        seen.add(url);
+        const entry = baseEntry(url, name);
+        if      (IMG_EXT.test(url)) photos.push(entry);
+        else if (VID_EXT.test(url)) videos.push(entry);
+        else if (AUD_EXT.test(url)) audios.push(entry);
+        else                        files.push(entry);
+      }
+      fileLinkRe.lastIndex = 0;
+
+      // 2) bare /uploads/ URLs / image markdown
+      while ((m = uploadRe.exec(content)) !== null) {
+        const url = m[1] || m[2];
+        if (!url || !url.startsWith('/uploads/')) continue;
+        if (seen.has(url)) continue;
+        seen.add(url);
+        const entry = baseEntry(url);
+        if      (IMG_EXT.test(url)) photos.push(entry);
+        else if (VID_EXT.test(url)) videos.push(entry);
+        else if (AUD_EXT.test(url)) audios.push(entry);
+        else                        files.push(entry);
+      }
+      uploadRe.lastIndex = 0;
+
+      // 3) http(s):// links — exclude /uploads/ (already counted above as
+      //    relative paths) and exclude raw image/video CDN links being
+      //    used as inline media (those are covered by link-preview, but
+      //    for the gallery we still treat them as 'link' to avoid noise).
+      while ((m = httpRe.exec(content)) !== null) {
+        const url = m[1].replace(/[)\].,!?]+$/, '');
+        if (seen.has(url)) continue;
+        // Skip same-origin /uploads (already captured)
+        if (/\/uploads\//i.test(url)) continue;
+        seen.add(url);
+        links.push(baseEntry(url, url));
+      }
+      httpRe.lastIndex = 0;
+    }
+
+    socket.emit('channel-media', {
+      channelCode: code,
+      photos,
+      videos,
+      audios,
+      files,
+      links,
+    });
   });
 
   // ── Send message ────────────────────────────────────────
@@ -463,25 +602,59 @@ module.exports = function register(socket, ctx) {
       if (Number.isFinite(reqBurn) && reqBurn >= 1 && reqBurn <= 300) burnSeconds = reqBurn;
     }
 
+    // ── Persona detection (#86, #5349) ────────────────────
+    // Pattern: "PersonaName: actual message body".  Persona names match
+    // against the sender's own user_personas (case-insensitive). When a
+    // match is found we strip the prefix from the stored content and
+    // stamp persona_id / persona_username / persona_avatar so the
+    // outgoing message displays as the persona while the real user_id
+    // (and therefore moderation) remains intact.
+    let personaId = null;
+    let personaUsername = null;
+    let personaAvatar = null;
+    let finalContent = safeContent;
+    {
+      const m = safeContent.match(/^([^\n:]{1,32}):\s+([\s\S]+)$/);
+      if (m) {
+        const candidate = m[1].trim();
+        const body = m[2];
+        if (candidate && body && body.trim().length > 0) {
+          const persona = db.prepare(
+            'SELECT id, name, avatar FROM user_personas WHERE user_id = ? AND name = ? COLLATE NOCASE'
+          ).get(socket.user.id, candidate);
+          if (persona) {
+            personaId = persona.id;
+            personaUsername = persona.name;
+            personaAvatar = persona.avatar || null;
+            finalContent = body.trim();
+          }
+        }
+      }
+    }
+
     try {
       const result = db.prepare(
-        'INSERT INTO messages (channel_id, user_id, content, reply_to, burn_seconds) VALUES (?, ?, ?, ?, ?)'
-      ).run(channel.id, socket.user.id, safeContent, replyTo, burnSeconds);
+        'INSERT INTO messages (channel_id, user_id, content, reply_to, burn_seconds, persona_id, persona_username, persona_avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(channel.id, socket.user.id, finalContent, replyTo, burnSeconds, personaId, personaUsername, personaAvatar);
 
       const message = {
         id: result.lastInsertRowid,
-        content: safeContent,
+        content: finalContent,
         created_at: new Date().toISOString(),
-        username: socket.user.displayName,
+        username: personaUsername || socket.user.displayName,
         user_id: socket.user.id,
-        avatar: socket.user.avatar || null,
-        avatar_shape: socket.user.avatar_shape || 'circle',
+        avatar: personaAvatar || socket.user.avatar || null,
+        avatar_shape: personaId ? 'circle' : (socket.user.avatar_shape || 'circle'),
         reply_to: replyTo,
         replyContext: null,
         reactions: [],
         edited_at: null,
         thread: null,
-        burn_seconds: burnSeconds || undefined
+        burn_seconds: burnSeconds || undefined,
+        persona_id: personaId || undefined,
+        persona_username: personaUsername || undefined,
+        persona_avatar: personaAvatar || undefined,
+        real_username: personaId ? socket.user.displayName : undefined,
       };
 
       if (replyTo) {
@@ -492,7 +665,11 @@ module.exports = function register(socket, ctx) {
       }
 
       io.to(`channel:${code}`).emit('new-message', { channelCode: code, message });
-      sendPushNotifications(channel.id, code, channel.name, socket.user.id, socket.user.displayName, safeContent);
+      // Burn messages must not reveal their content in push notifications —
+      // the whole point is that the recipient has to actively reveal them.
+      const pushContent = burnSeconds > 0 ? '🔥 Sent a burn message' : finalContent;
+      const pushDisplayName = personaUsername || socket.user.displayName;
+      sendPushNotifications(channel.id, code, channel.name, socket.user.id, pushDisplayName, pushContent);
       fireWebhookCallbacks(channel.id, code, message);
 
       try {

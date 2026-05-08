@@ -79,6 +79,8 @@ async switchChannel(code) {
   }
   document.getElementById('search-toggle-btn').style.display = '';
   document.getElementById('pinned-toggle-btn').style.display = '';
+  const _galleryBtn = document.getElementById('gallery-toggle-btn');
+  if (_galleryBtn) _galleryBtn.style.display = '';
   // Auto-close pinned panel on channel switch so stale pins don't linger
   document.getElementById('pinned-panel').style.display = 'none';
 
@@ -2658,6 +2660,8 @@ _fireNativeNotification(message, channelCode, opts) {
   let rawContent = message.content || '';
   // Detect E2E encrypted envelope — show generic text instead of ciphertext
   try { const p = JSON.parse(rawContent); if (p && p.v && p.ct) rawContent = ''; } catch { /* not JSON */ }
+  // Burn-after-read: never reveal the message content in a notification
+  if (message.burn_seconds && message.burn_seconds > 0) rawContent = '🔥 Sent a burn message';
   const body = rawContent.length > 120
     ? rawContent.slice(0, 117) + '...'
     : (rawContent || 'Sent a message');

@@ -786,6 +786,11 @@ _createMessageEl(msg, prevMsg) {
     ? '<span class="discord-badge">DISCORD</span>'
     : msg.is_webhook ? '<span class="bot-badge">BOT</span>' : '';
 
+  // Persona badge (#86, #5349) — shown when message was sent via a user persona
+  const personaBadge = msg.persona_id
+    ? `<span class="persona-msg-badge" title="${this._escapeHtml((window.t && t('app.messages.via_persona', { name: msg.real_username || '' })) || `Sent via ${msg.real_username || 'real account'}`)}">persona</span>`
+    : '';
+
   const el = document.createElement('div');
   el.className = 'message'
     + (needsStatusSlot ? ' message-has-status' : '')
@@ -824,6 +829,7 @@ _createMessageEl(msg, prevMsg) {
           <span class="message-author" style="color:${authorColor}"${this._nicknames[msg.user_id] ? ` title="${this._escapeHtml(msg.username)}"` : ''}>${this._escapeHtml(this._getNickname(msg.user_id, msg.username))}</span>
           ${msgRoleIconAfter}
           ${botBadge}
+          ${personaBadge}
           ${msgRoleBadge}
           <span class="message-time">${this._formatTime(msg.created_at)}</span>
           ${pinnedTag}

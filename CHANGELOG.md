@@ -11,6 +11,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Haven uses [Sema
 
 ---
 
+## [3.15.0] — 2026-05-08
+
+### Added
+- **Channel Media Gallery (#5350).** New 🖼 button in the channel header opens a near full-screen modal with five tabs: Photos, Videos, Audio, Files, and Links. Photos and videos render as a clickable album-style grid (photos open in the lightbox, videos jump to the source message). Audio, files, and links use a list layout with inline players, download links, and a jump-to-message button. Each entry shows the date it was posted. Tab counts update on open. Powered by a new `get-channel-media` socket handler that scans the channel for upload paths and external links.
+- **Personas (#86, #5349).** Profile settings now have a "👥 Personas" section where you can create up to 25 named alter-egos with their own name and avatar, then send messages as one of them by typing `Name: your message` in chat (case-insensitive, the prefix is stripped before send). Each persona-sent message is stored with both the persona identity AND your real account ID, so messages are visibly tagged with a small `persona` badge (hover to see the real sender) and remain fully moderatable. Persona avatars upload via the same magic-byte-validated path as user avatars (2 MB cap). Persona names cannot collide with existing usernames or display names to prevent impersonation.
+
+---
+
 ## [3.14.16] — 2026-05-07
 
 ### Fixed

@@ -417,6 +417,31 @@ function initDatabase() {
     db.exec("ALTER TABLE messages ADD COLUMN webhook_username TEXT DEFAULT NULL");
   }
 
+  // ── Migration: personas (proxy feature) (#86, #5349) ────
+  // Per-user personas: name + avatar override stored on the message so the
+  // real user_id stays intact for moderation / kicks / bans, but the
+  // displayed identity is the persona.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_personas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      avatar TEXT DEFAULT NULL,
+      bio TEXT DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, name COLLATE NOCASE)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_personas_user ON user_personas(user_id);
+  `);
+  const personaMsgCols = [
+    { name: 'persona_id',       sql: "ALTER TABLE messages ADD COLUMN persona_id INTEGER DEFAULT NULL REFERENCES user_personas(id) ON DELETE SET NULL" },
+    { name: 'persona_username', sql: "ALTER TABLE messages ADD COLUMN persona_username TEXT DEFAULT NULL" },
+    { name: 'persona_avatar',   sql: "ALTER TABLE messages ADD COLUMN persona_avatar TEXT DEFAULT NULL" },
+  ];
+  for (const col of personaMsgCols) {
+    try { db.prepare(`SELECT ${col.name} FROM messages LIMIT 0`).get(); } catch { db.exec(col.sql); }
+  }
+
   // ── Migration: roles system ─────────────────────────────
   db.exec(`
     CREATE TABLE IF NOT EXISTS roles (

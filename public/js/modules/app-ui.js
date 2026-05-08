@@ -1341,6 +1341,43 @@ _setupUI() {
     document.getElementById('pinned-panel').style.display = 'none';
   });
 
+  // ── Channel media gallery (#5350) ──
+  const galleryBtn = document.getElementById('gallery-toggle-btn');
+  if (galleryBtn) {
+    galleryBtn.addEventListener('click', () => {
+      if (!this.currentChannel) return;
+      const modal = document.getElementById('media-gallery-modal');
+      const body = document.getElementById('media-gallery-body');
+      body.innerHTML = `<div class="media-gallery-empty muted-text">${(window.t && t('media_gallery.loading')) || 'Loading…'}</div>`;
+      // Reset tab counts
+      ['photos','videos','audios','files','links'].forEach(k => {
+        const el = document.getElementById(`media-count-${k}`);
+        if (el) el.textContent = '0';
+      });
+      // Default to Photos tab
+      document.querySelectorAll('#media-gallery-modal .media-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'photos'));
+      this._mediaGalleryActiveTab = 'photos';
+      modal.style.display = 'flex';
+      this.socket.emit('get-channel-media', { code: this.currentChannel });
+    });
+  }
+  const galleryClose = document.getElementById('media-gallery-close');
+  if (galleryClose) galleryClose.addEventListener('click', () => {
+    document.getElementById('media-gallery-modal').style.display = 'none';
+  });
+  const galleryModal = document.getElementById('media-gallery-modal');
+  if (galleryModal) galleryModal.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  // Tab switching
+  document.querySelectorAll('#media-gallery-modal .media-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#media-gallery-modal .media-tab').forEach(b => b.classList.toggle('active', b === btn));
+      this._mediaGalleryActiveTab = btn.dataset.tab;
+      if (this._mediaGalleryData) this._renderMediaGalleryTab(this._mediaGalleryActiveTab);
+    });
+  });
+
   // Right sidebar collapse toggle (persisted to localStorage)
   const sidebarToggle = document.getElementById('sidebar-toggle-btn');
   const rightSidebar = document.getElementById('right-sidebar');
@@ -2393,6 +2430,8 @@ _setupUI() {
     // Populate bio
     const bioInput = document.getElementById('edit-profile-bio');
     if (bioInput) bioInput.value = this.user.bio || '';
+    // Load personas list (#86, #5349)
+    this._loadPersonas?.();
     this._updateAvatarPreview();
     // Sync shape picker buttons
     const picker = document.getElementById('avatar-shape-picker');
@@ -2554,6 +2593,10 @@ _setupUI() {
   });
 
   document.getElementById('save-rename-btn').addEventListener('click', () => this._saveRename());
+
+  // Add persona button (#86, #5349)
+  const addPersonaBtn = document.getElementById('add-persona-btn');
+  if (addPersonaBtn) addPersonaBtn.addEventListener('click', () => this._showPersonaEditor?.(null));
 
   document.getElementById('rename-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') this._saveRename();
@@ -5267,6 +5310,269 @@ async _uploadImage(file, targetCode, bundled = false) {
   } catch (err) {
     this._showToast(err.message || t('toasts.upload_failed'), 'error');
   }
+},
+
+// ── Channel Media Gallery (#5350) ─────────────────────
+_renderMediaGallery(data) {
+  this._mediaGalleryData = data;
+  ['photos','videos','audios','files','links'].forEach(k => {
+    const el = document.getElementById(`media-count-${k}`);
+    if (el) el.textContent = String((data[k] || []).length);
+  });
+  this._renderMediaGalleryTab(this._mediaGalleryActiveTab || 'photos');
+},
+
+_renderMediaGalleryTab(tab) {
+  const body = document.getElementById('media-gallery-body');
+  if (!body || !this._mediaGalleryData) return;
+  const items = this._mediaGalleryData[tab] || [];
+  if (items.length === 0) {
+    const labels = {
+      photos: 'No photos in this channel yet',
+      videos: 'No videos in this channel yet',
+      audios: 'No audio files in this channel yet',
+      files:  'No files in this channel yet',
+      links:  'No links in this channel yet',
+    };
+    body.innerHTML = `<div class="media-gallery-empty muted-text">${labels[tab] || 'Nothing here yet'}</div>`;
+    return;
+  }
+
+  const fmt = (iso) => {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch { return ''; }
+  };
+  const esc = (s) => this._escapeHtml ? this._escapeHtml(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  if (tab === 'photos') {
+    body.innerHTML = `<div class="media-gallery-grid">${items.map(it => `
+      <div class="media-grid-item" data-url="${esc(it.url)}" data-msg-id="${it.message_id}" data-action="lightbox" title="${esc(it.username || '')} • ${esc(fmt(it.created_at))}">
+        <img src="${esc(it.url)}" loading="lazy" alt="">
+        <div class="media-grid-date">${esc(fmt(it.created_at))}</div>
+      </div>`).join('')}</div>`;
+  } else if (tab === 'videos') {
+    body.innerHTML = `<div class="media-gallery-grid">${items.map(it => `
+      <div class="media-grid-item" data-url="${esc(it.url)}" data-msg-id="${it.message_id}" data-action="jump" title="${esc(it.username || '')} • ${esc(fmt(it.created_at))}">
+        <video src="${esc(it.url)}" preload="metadata" muted></video>
+        <div class="media-grid-play">▶</div>
+        <div class="media-grid-date">${esc(fmt(it.created_at))}</div>
+      </div>`).join('')}</div>`;
+  } else if (tab === 'audios') {
+    body.innerHTML = `<div class="media-list">${items.map(it => `
+      <div class="media-list-item" data-msg-id="${it.message_id}">
+        <div class="media-list-icon">🎵</div>
+        <div class="media-list-info">
+          <span class="media-list-name">${esc(it.name || it.url.split('/').pop())}</span>
+          <span class="media-list-meta">${esc(it.username || '')} • ${esc(fmt(it.created_at))}</span>
+          <audio class="media-list-audio" src="${esc(it.url)}" controls preload="none"></audio>
+        </div>
+        <button class="media-list-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+      </div>`).join('')}</div>`;
+  } else if (tab === 'files') {
+    body.innerHTML = `<div class="media-list">${items.map(it => `
+      <a class="media-list-item" href="${esc(it.url)}" download target="_blank" rel="noopener">
+        <div class="media-list-icon">📄</div>
+        <div class="media-list-info">
+          <span class="media-list-name">${esc(it.name || it.url.split('/').pop())}</span>
+          <span class="media-list-meta">${esc(it.username || '')} • ${esc(fmt(it.created_at))}</span>
+        </div>
+        <button class="media-list-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+      </a>`).join('')}</div>`;
+  } else if (tab === 'links') {
+    body.innerHTML = `<div class="media-list">${items.map(it => {
+      let host = '';
+      try { host = new URL(it.url).hostname; } catch {}
+      return `
+      <a class="media-list-item" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer nofollow">
+        <div class="media-list-icon">🔗</div>
+        <div class="media-list-info">
+          <span class="media-list-name">${esc(host || it.url)}</span>
+          <span class="media-list-meta">${esc(it.url)}</span>
+          <span class="media-list-meta">${esc(it.username || '')} • ${esc(fmt(it.created_at))}</span>
+        </div>
+        <button class="media-list-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+      </a>`;
+    }).join('')}</div>`;
+  }
+
+  // Bind clicks: lightbox for photos, jump-to-message for jump buttons / video tiles
+  body.querySelectorAll('[data-action="lightbox"]').forEach(el => {
+    el.addEventListener('click', () => {
+      const url = el.dataset.url;
+      if (url && this._openLightbox) this._openLightbox(url);
+    });
+  });
+  body.querySelectorAll('[data-action="jump"]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = parseInt(el.dataset.msgId);
+      if (!id) return;
+      document.getElementById('media-gallery-modal').style.display = 'none';
+      if (this._jumpToMessage) this._jumpToMessage(id);
+    });
+  });
+},
+
+// ── Personas (#86, #5349) ──────────────────────────────
+async _loadPersonas() {
+  try {
+    const res = await fetch('/api/personas', {
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    if (!res.ok) throw new Error('Failed to load personas');
+    const data = await res.json();
+    this._personas = data.personas || [];
+    this._renderPersonasList();
+  } catch (err) {
+    console.error('Load personas error:', err);
+  }
+},
+
+_renderPersonasList() {
+  const list = document.getElementById('personas-list');
+  if (!list) return;
+  const personas = this._personas || [];
+  const esc = (s) => this._escapeHtml ? this._escapeHtml(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (personas.length === 0) {
+    list.innerHTML = `<p class="muted-text" style="font-size:.78rem;margin:6px 0">No personas yet. Click "+ Add Persona" to create one.</p>`;
+    return;
+  }
+  list.innerHTML = personas.map(p => `
+    <div class="persona-item" data-persona-id="${p.id}">
+      <div class="persona-item-avatar">${p.avatar
+          ? `<img src="${esc(p.avatar)}" alt="">`
+          : esc((p.name || '?').charAt(0).toUpperCase())}</div>
+      <div class="persona-item-info">
+        <div class="persona-item-name">${esc(p.name)}</div>
+        <div class="persona-item-trigger">${esc(p.name)}: your message</div>
+      </div>
+      <div class="persona-item-actions">
+        <button class="persona-edit-btn" data-id="${p.id}" title="Edit">✎</button>
+        <button class="persona-delete-btn" data-id="${p.id}" title="Delete">🗑</button>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.persona-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => this._showPersonaEditor(parseInt(btn.dataset.id)));
+  });
+  list.querySelectorAll('.persona-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = parseInt(btn.dataset.id);
+      const persona = (this._personas || []).find(p => p.id === id);
+      if (!persona) return;
+      if (!confirm(`Delete persona "${persona.name}"? Past messages stay attributed to it.`)) return;
+      try {
+        const res = await fetch(`/api/personas/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to delete');
+        this._personas = (this._personas || []).filter(p => p.id !== id);
+        this._renderPersonasList();
+      } catch (err) {
+        this._showToast?.(err.message || 'Delete failed', 'error');
+      }
+    });
+  });
+},
+
+_showPersonaEditor(id) {
+  const list = document.getElementById('personas-list');
+  if (!list) return;
+  const existing = id ? (this._personas || []).find(p => p.id === id) : null;
+  // If editor already open, close it first
+  const existingEditor = list.querySelector('.persona-edit-row');
+  if (existingEditor) existingEditor.remove();
+
+  const editor = document.createElement('div');
+  editor.className = 'persona-edit-row';
+  const esc = (s) => this._escapeHtml ? this._escapeHtml(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  editor.innerHTML = `
+    <div class="persona-edit-controls">
+      <div class="persona-item-avatar" id="persona-edit-avatar-preview">${existing && existing.avatar
+          ? `<img src="${esc(existing.avatar)}" alt="">`
+          : '?'}</div>
+      <input type="text" id="persona-edit-name" maxlength="32" placeholder="Persona name" value="${existing ? esc(existing.name) : ''}">
+      <button type="button" class="btn-sm" id="persona-edit-upload">Upload Avatar</button>
+      <input type="file" id="persona-edit-file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none">
+    </div>
+    <div class="persona-edit-controls" style="justify-content:flex-end">
+      <button type="button" class="btn-sm" id="persona-edit-cancel">Cancel</button>
+      <button type="button" class="btn-sm btn-accent" id="persona-edit-save">${existing ? 'Save' : 'Create'}</button>
+    </div>
+  `;
+  if (existing) {
+    const itemEl = list.querySelector(`.persona-item[data-persona-id="${id}"]`);
+    if (itemEl) itemEl.after(editor); else list.prepend(editor);
+  } else {
+    list.prepend(editor);
+  }
+
+  let pendingAvatarUrl = existing ? existing.avatar : null;
+  const fileInput = editor.querySelector('#persona-edit-file');
+  editor.querySelector('#persona-edit-upload').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      this._showToast?.('Avatar must be under 2 MB', 'error');
+      return;
+    }
+    const fd = new FormData();
+    fd.append('avatar', file);
+    try {
+      const res = await fetch('/api/upload-persona-avatar', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      pendingAvatarUrl = data.url;
+      const preview = editor.querySelector('#persona-edit-avatar-preview');
+      preview.innerHTML = `<img src="${esc(data.url)}" alt="">`;
+    } catch (err) {
+      this._showToast?.(err.message || 'Upload failed', 'error');
+    }
+  });
+
+  editor.querySelector('#persona-edit-cancel').addEventListener('click', () => editor.remove());
+  editor.querySelector('#persona-edit-name').focus();
+  editor.querySelector('#persona-edit-save').addEventListener('click', async () => {
+    const name = editor.querySelector('#persona-edit-name').value.trim();
+    if (!name) {
+      this._showToast?.('Name is required', 'error');
+      return;
+    }
+    try {
+      const url = existing ? `/api/personas/${existing.id}` : '/api/personas';
+      const method = existing ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+        body: JSON.stringify({ name, avatar: pendingAvatarUrl })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      // Update local list
+      if (existing) {
+        const idx = this._personas.findIndex(p => p.id === existing.id);
+        if (idx >= 0) this._personas[idx] = data.persona;
+      } else {
+        this._personas = [...(this._personas || []), data.persona].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      }
+      editor.remove();
+      this._renderPersonasList();
+    } catch (err) {
+      this._showToast?.(err.message || 'Save failed', 'error');
+    }
+  });
 },
 
 };

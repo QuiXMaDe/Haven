@@ -1355,6 +1355,12 @@ _setupSocketListeners() {
     }
   });
 
+  // ── Channel Media Gallery (#5350) ──
+  this.socket.on('channel-media', (data) => {
+    if (!data || data.channelCode !== this.currentChannel) return;
+    this._renderMediaGallery?.(data);
+  });
+
   this.socket.on('message-archived', (data) => {
     if (data.channelCode === this.currentChannel) {
       const msgEl = document.querySelector(`[data-msg-id="${data.messageId}"]`);

@@ -295,6 +295,7 @@
             <span class="header-actions-divider"></span>
             <button id="search-toggle-btn" class="icon-btn small" data-i18n-title="header.search_messages" title="Search messages (Ctrl+F)">🔍</button>
             <button id="pinned-toggle-btn" class="icon-btn small" data-i18n-title="header.pinned_messages" title="Pinned messages">📌</button>
+            <button id="gallery-toggle-btn" class="icon-btn small" data-i18n-title="header.media_gallery" title="View files & media">🖼</button>
             <button id="move-select-btn" class="icon-btn small" data-i18n-title="header.select_messages_to_move" title="Select messages to move" style="display:none">☰</button>
             <div class="e2e-menu-wrapper" style="display:none" id="e2e-menu-wrapper">
               <button id="e2e-menu-btn" class="icon-btn small" data-i18n-title="header.encryption_options" title="Encryption options">🔐</button>
@@ -990,6 +991,18 @@
       <div class="form-group" style="margin-top:8px">
         <label data-i18n="modals.edit_profile.bio_label">Bio</label> <span class="muted-text" data-i18n="modals.edit_profile.bio_max">(max 190 chars)</span>
         <textarea id="edit-profile-bio" class="edit-profile-textarea" maxlength="190" data-i18n-placeholder="modals.edit_profile.bio_placeholder" placeholder="Tell people about yourself…" rows="2"></textarea>
+      </div>
+
+      <!-- Personas (#86, #5349) -->
+      <div class="personas-section" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+        <div class="personas-section-header">
+          <h5 class="settings-section-subtitle" style="margin:0" data-i18n="modals.edit_profile.personas_title">👥 Personas</h5>
+          <button type="button" class="btn-sm" id="add-persona-btn" data-i18n="modals.edit_profile.add_persona">+ Add Persona</button>
+        </div>
+        <p class="muted-text" style="margin:6px 0 8px;font-size:.78rem;line-height:1.35" data-i18n="modals.edit_profile.personas_hint">
+          Type <code>Name: your message</code> in chat to send as that persona. Your real account stays linked for moderation.
+        </p>
+        <div id="personas-list" class="personas-list"></div>
       </div>
 
       <div class="modal-actions">
@@ -3161,6 +3174,26 @@
     <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next image">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
     </button>
+  </div>
+
+  <!-- Channel Media Gallery Modal (#5350) -->
+  <div class="modal-overlay" id="media-gallery-modal" style="display:none">
+    <div class="modal media-gallery-modal">
+      <div class="media-gallery-header">
+        <h3 data-i18n="media_gallery.title">Files & Media</h3>
+        <button class="icon-btn small" id="media-gallery-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="media-gallery-tabs" role="tablist">
+        <button class="media-tab active" data-tab="photos" role="tab">🖼 <span data-i18n="media_gallery.photos">Photos</span> <span class="media-tab-count" id="media-count-photos">0</span></button>
+        <button class="media-tab" data-tab="videos" role="tab">🎬 <span data-i18n="media_gallery.videos">Videos</span> <span class="media-tab-count" id="media-count-videos">0</span></button>
+        <button class="media-tab" data-tab="audios" role="tab">🎵 <span data-i18n="media_gallery.audio">Audio</span> <span class="media-tab-count" id="media-count-audios">0</span></button>
+        <button class="media-tab" data-tab="files"  role="tab">📄 <span data-i18n="media_gallery.files">Files</span>  <span class="media-tab-count" id="media-count-files">0</span></button>
+        <button class="media-tab" data-tab="links"  role="tab">🔗 <span data-i18n="media_gallery.links">Links</span>  <span class="media-tab-count" id="media-count-links">0</span></button>
+      </div>
+      <div class="media-gallery-body" id="media-gallery-body">
+        <div class="media-gallery-empty muted-text" data-i18n="media_gallery.loading">Loading…</div>
+      </div>
+    </div>
   </div>
   <script src="/js/theme.js?v=3.14.14"></script>
   <script src="/js/notifications.js?v=3.14.14"></script>
