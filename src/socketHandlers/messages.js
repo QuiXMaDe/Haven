@@ -779,7 +779,11 @@ module.exports = function register(socket, ctx) {
     const _editMax = parseInt(_editMaxRow?.value) || 2000;
     if (!isInt(data.messageId) || !isString(data.content, 1, _editMax)) return;
 
-    const code = socket.currentChannel;
+    // Accept an explicit channelCode from the client (e.g. DM PiP, where
+    // socket.currentChannel is a different server channel). Fall back to
+    // socket.currentChannel for backwards compatibility.
+    const rawCode = typeof data.channelCode === 'string' ? data.channelCode.trim() : null;
+    const code = (rawCode && /^[a-f0-9]{8}$/i.test(rawCode)) ? rawCode : socket.currentChannel;
     if (!code) return;
 
     const channel = db.prepare('SELECT id FROM channels WHERE code = ?').get(code);

@@ -11,6 +11,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Haven uses [Sema
 
 ---
 
+## [3.16.10] — 2026-05-15
+
+### Fixed
+- **Displayed server version was stuck at `v3.16.5` even after updating (#5364).** The `v3.16.6` commit bumped `package.json` to `3.16.5` (off-by-one), and none of the subsequent v3.16.7 / v3.16.8 / v3.16.9 commits actually bumped the version field. Because both `/api/version` and the `session-info` socket emit read directly from `package.json`, every installation since v3.16.6 has reported itself as `v3.16.5` in the status bar regardless of which release was actually deployed — which also kept the in-app update banner flagging an update that users had already installed. Fixed by bumping `package.json` to `3.16.10` and bumping all `?v=` cache-bust query strings in `app.html` so the client also picks up the freshly versioned assets.
+- **Belatedly shipping the originally-intended v3.16.5 fixes.** The `## [3.16.5]` changelog entry described an `edit-message` DM-PiP fix and a more detailed encrypted-upload error toast, but the corresponding code changes (`public/js/modules/app-admin.js`, `public/js/modules/app-utilities.js`, `src/socketHandlers/messages.js`) were never committed and only existed in the working tree. They are now committed as part of this release. Editing a message from a DM PiP while focused on a different server channel now resolves the correct channel server-side, and encrypted DM upload failures now show the underlying error message in the toast.
+
+---
+
 ## [3.16.9] — 2026-05-15
 
 ### Fixed
