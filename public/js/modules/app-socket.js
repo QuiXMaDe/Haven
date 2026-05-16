@@ -812,6 +812,24 @@ _setupSocketListeners() {
     if (myId && !isInVoice) {
       users = users.filter(u => u.id !== myId);
     }
+    // If we ARE in voice here but the server snapshot doesn't include us
+    // (race: request-voice-users arrived before voice-join was processed,
+    // or pruneStaleVoiceUsers briefly evicted our stale socket entry during
+    // a reconnect window before voice-rejoin re-registered us), inject our
+    // own entry from local state so the panel never shows us as absent
+    // while the voice bar says "Voice Connected". (#self-absent-voice-panel)
+    if (isInVoice && myId && !users.some(u => u.id === myId)) {
+      users = [
+        {
+          id: myId,
+          username: this.user.displayName || this.user.username,
+          roleColor: this.user.roleColor || null,
+          isMuted: !!(this.voice && this.voice.isMuted),
+          isDeafened: !!(this.voice && this.voice.isDeafened)
+        },
+        ...users
+      ];
+    }
     if ((isViewing || isInVoice) && localStorage.getItem('haven_hide_voice_panel') !== 'true') {
       this._renderVoiceUsers(users);
     }

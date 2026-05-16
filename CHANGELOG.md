@@ -11,6 +11,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Haven uses [Sema
 
 ---
 
+## [3.16.9] — 2026-05-15
+
+### Fixed
+- **You don't appear in the voice panel or sidebar while in voice.** After a socket reconnect (or any event that triggered a server-side voice broadcast during the rejoin window), `pruneStaleVoiceUsers` could briefly remove your entry before `voice-rejoin` re-registered the new socket. The resulting `voice-users-update` snapshot would contain everyone else but not you. Since `isInVoice` was still `true`, the self-filter didn't run, but your entry was simply absent from the server's payload, and the panel would stick showing only other participants. The fix: when we are confirmed to be in voice on a channel but our own entry is missing from the server snapshot, we inject it from local state before rendering.
+
+---
+
 ## [3.16.8] — 2026-05-15
 
 ### Fixed
