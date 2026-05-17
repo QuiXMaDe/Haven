@@ -101,17 +101,17 @@
                        data-i18n-placeholder="app.sidebar.channel_name_placeholder" placeholder="Channel name..." maxlength="50">
                 <button id="create-channel-btn" class="btn-sm btn-accent">+</button>
               </div>
-              <label class="checkbox-row" style="margin:6px 0 2px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8rem;opacity:0.8">
+              <label class="checkbox-row" title="Invite-only" style="margin:6px 0 2px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8rem;opacity:0.8">
                 <input type="checkbox" id="new-channel-private" style="width:14px;height:14px">
-                <span>🔒 <span data-i18n="app.sidebar.private_channel">Private</span></span> <span style="opacity:0.5;font-size:0.75rem" data-i18n="app.sidebar.private_hint">(invite-only)</span>
+                <span>🔒 <span data-i18n="app.sidebar.private_channel">Private</span></span>
               </label>
-              <label class="checkbox-row" style="margin:2px 0;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8rem;opacity:0.8">
+              <label class="checkbox-row" title="Auto-deletes when empty" style="margin:2px 0;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8rem;opacity:0.8">
                 <input type="checkbox" id="new-channel-temporary" style="width:14px;height:14px">
-                <span>⏱️ <span data-i18n="app.sidebar.temporary_channel">Temporary</span></span> <span style="opacity:0.5;font-size:0.75rem" data-i18n="app.sidebar.temporary_hint">(auto-delete)</span>
+                <span>⏱️ <span data-i18n="app.sidebar.temporary_channel">Temporary</span></span>
               </label>
-              <label class="checkbox-row" id="new-channel-add-all-row" style="margin:2px 0;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8rem;opacity:0.8">
+              <label class="checkbox-row" id="new-channel-add-all-row" title="Everyone joins automatically" style="margin:2px 0;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8rem;opacity:0.8">
                 <input type="checkbox" id="new-channel-add-all" style="width:14px;height:14px">
-                <span>👥 <span data-i18n="app.sidebar.add_all_members">Add all server members</span></span> <span style="opacity:0.5;font-size:0.75rem" data-i18n="app.sidebar.add_all_hint">(everyone joins automatically)</span>
+                <span>👥 <span data-i18n="app.sidebar.add_all_members">Add all members</span></span>
               </label>
               <div id="temp-channel-duration-row" style="display:none;margin:4px 0 2px;padding-left:22px">
                 <div class="input-row" style="gap:6px;align-items:center">
