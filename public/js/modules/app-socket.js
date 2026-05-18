@@ -90,6 +90,14 @@ _setupSocketListeners() {
     this._lastConnectTime = Date.now();
     this._authErrorStreak = 0;
     this._startPingMonitor();
+    // (#self-absent-voice-panel) Cancel any pending soft-leave from a brief
+    // socket blip — we reconnected before the 2 s deadline, so the voice
+    // session is still live and just needs to rebind its socketId on the
+    // server side via voice-rejoin (handled below).
+    if (this._voiceDisconnectTimer) {
+      clearTimeout(this._voiceDisconnectTimer);
+      this._voiceDisconnectTimer = null;
+    }
     // Re-join channel after reconnect (server lost our room membership)
     this.socket.emit('visibility-change', { visible: !document.hidden });
     this.socket.emit('get-channels');
@@ -249,13 +257,31 @@ _setupSocketListeners() {
     this._setLed('status-server-led', 'danger pulse');
     document.getElementById('status-server-text').textContent = 'Disconnected';
     document.getElementById('status-ping').textContent = '--';
-    // Mobile fix: if we were in voice when the socket dropped, clean up local
-    // voice state so the UI resets and auto-rejoin can work on reconnect.
+    // (#self-absent-voice-panel — Desktop "lost myself in voice" follow-up)
+    // Previously we _softLeave()'d the voice session immediately on every
+    // disconnect. Socket.io aggressively reconnects within a few hundred ms
+    // on transient network blips (especially Electron suspending the
+    // renderer momentarily), and the immediate teardown caused a cascade:
+    //   1. inVoice flips to false → defensive self-injection no longer
+    //      happens → voice panel shows everyone except us.
+    //   2. The reconnect path then has to rebuild the mic + AudioContext +
+    //      every RTCPeerConnection, which is heavy and prone to ICE failures
+    //      that other peers interpret as us "going stale".
+    // Defer the teardown by 2 s; if we reconnect first (the common case),
+    // skip the soft-leave entirely. The reconnect handler will issue
+    // `voice-rejoin` which rebinds our voice slot to the new socketId.
     if (this.voice && this.voice.inVoice) {
-      this.voice._softLeave();
-      this._updateVoiceButtons(false);
-      this._updateVoiceStatus(false);
-      this._updateVoiceBar();
+      if (this._voiceDisconnectTimer) clearTimeout(this._voiceDisconnectTimer);
+      this._voiceDisconnectTimer = setTimeout(() => {
+        this._voiceDisconnectTimer = null;
+        if (this.socket?.connected) return; // reconnected in time
+        if (!(this.voice && this.voice.inVoice)) return;
+        console.warn('[Voice] socket still down after 2s — soft-leaving voice');
+        this.voice._softLeave();
+        this._updateVoiceButtons(false);
+        this._updateVoiceStatus(false);
+        this._updateVoiceBar();
+      }, 2000);
     }
   });
 
@@ -839,6 +865,21 @@ _setupSocketListeners() {
         },
         ...users
       ];
+      // Self-heal: it's not enough to just patch the UI. If the server's
+      // roster doesn't include us, peers also don't have our updated
+      // socketId and our audio is silently broken until we manually leave
+      // and rejoin (the exact "I have to leave and rejoin, and that kicks
+      // everyone else" pattern reported repeatedly). Ask the server to
+      // rebind our voice slot via voice-rejoin, which broadcasts
+      // voice-user-left for any stale entry of us and re-adds us with the
+      // current socketId so peers re-negotiate cleanly. Throttle to once
+      // per ~3 s so we don't spam if the server's still missing us.
+      const now = Date.now();
+      if ((now - (this._lastVoiceSelfHealAt || 0)) > 3000 && this.socket?.connected) {
+        this._lastVoiceSelfHealAt = now;
+        console.warn('[Voice] Self missing from roster — emitting voice-rejoin');
+        this.socket.emit('voice-rejoin', { code: data.channelCode });
+      }
     }
     if ((isViewing || isInVoice) && localStorage.getItem('haven_hide_voice_panel') !== 'true') {
       this._renderVoiceUsers(users, data.channelCode);
