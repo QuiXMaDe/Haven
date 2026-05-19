@@ -11,6 +11,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Haven uses [Sema
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **Voice chat: recurring "I vanished from my own voice panel even though I can still talk" glitch (#5347, again).** Previous patches added a soft-leave deferral and a passive self-inject in `voice-users-update`, but neither fixed the underlying cause: the server's `disconnect` handler was eagerly removing the user from `voiceUsers` on every blip and broadcasting `voice-user-left` to peers. On the common transient case (Electron renderer briefly suspends, NAT rebind, brief Wi-Fi hiccup) the user reconnected within a second or two, but by then peers had already torn down their `RTCPeerConnection`s — or worse, the server's roster was empty and the rejoin never fully repaired the local UI, so the user kept seeing only other people in the voice panel while their own mic still worked. This release stops the bleeding at the source:
+  - **Server-side 4 s grace period before evicting on disconnect.** Instead of immediately calling `handleVoiceLeave`, the server now schedules eviction 4 seconds out. If the user's voice slot is reclaimed by a `voice-join` or `voice-rejoin` from a new socket before the timer fires, the eviction is cancelled, the `voiceUsers` entry is rebound to the new socketId, and peers are never told `voice-user-left` — meaning their `RTCPeerConnection`s stay live and audio is uninterrupted across the blip.
+  - **Fast-path rejoin that skips peer renegotiation.** When the grace-period fast-path triggers, the server sends `voice-existing-users` with a new `skipRenegotiate` flag so the rejoining client does NOT rebuild fresh `RTCPeerConnection`s on top of working ones (which would have killed audio for no reason).
+  - **Client-side voice roster watchdog.** Every 10 seconds, if we're in voice and the socket is connected, the client polls the server's authoritative roster with an `iAmInVoice: true` hint. If the server confirms we're missing despite claiming to be in voice, the existing self-heal path fires `voice-rejoin` automatically — so even if some edge case still leaves us in a desynced state, it self-corrects within 10 s instead of sticking forever until manual leave+rejoin.
+  - Verbose `[VoiceDiag]` / `[VoiceWatchdog]` / `[VoiceSelfHeal]` server + client logs at every critical transition so any remaining edge case is trivially diagnosable from a single screenshot of the console.
+
+---
+
 ## [3.16.13] — 2026-05-17
 
 ### Added

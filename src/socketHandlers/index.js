@@ -47,12 +47,13 @@ function setupSocketHandlers(io, db) {
   const streamViewers       = new Map(); // "code:sharerId" → Set<viewerUserId>
   const slowModeTracker     = new Map(); // "slow:{userId}:{channelId}" → timestamp
   const pendingTempDelete   = new Map(); // code → timeout handle (grace-period before deleting temp-voice channel)
+  const pendingVoiceLeave   = new Map(); // `${userId}:${code}` → { timer, oldSocketId } (grace-period before evicting a transiently-disconnected voice user)
 
   const state = {
     channelUsers, voiceUsers, voiceLastActivity,
     activeMusic, musicQueues,
     activeScreenSharers, activeWebcamUsers, streamViewers,
-    slowModeTracker, pendingTempDelete
+    slowModeTracker, pendingTempDelete, pendingVoiceLeave
   };
 
   // Transfer-admin mutex (shared across all connections to prevent race conditions)
@@ -1338,7 +1339,41 @@ function setupSocketHandlers(io, db) {
         if (!room) continue;
         const voiceEntry = room.get(socket.user.id);
         if (voiceEntry && voiceEntry.socketId === socket.id) {
-          handleVoiceLeave(socket, code, { softDisconnect: true });
+          // GRACE PERIOD: socket.io aggressively reconnects within a few
+          // hundred ms on transient network blips (Electron renderer
+          // suspends, mobile screen sleep, NAT rebind, etc.). Eagerly
+          // removing the user here causes the recurring "I vanished from
+          // my own voice panel even though I can still talk" bug — the
+          // peers' RTCPeerConnections survive (so audio works) but every
+          // client wipes the user from their roster and the user is
+          // missing until they manually leave and rejoin.
+          //
+          // Instead, schedule eviction in 4 s. If voice-rejoin or
+          // voice-join arrives from the user before the timer fires, we
+          // cancel the eviction and just rebind the socketId on the
+          // existing entry — peers never see voice-user-left, and the
+          // panels never blank.
+          const key = `${socket.user.id}:${code}`;
+          const existingPending = pendingVoiceLeave.get(key);
+          if (existingPending) clearTimeout(existingPending.timer);
+          const oldSocketId = socket.id;
+          console.log(`[VoiceDiag] disconnect for ${socket.user.username} (id=${socket.user.id}) on ${code} — scheduling 4s grace eviction (oldSocket=${oldSocketId})`);
+          const timer = setTimeout(() => {
+            pendingVoiceLeave.delete(key);
+            const stillRoom = voiceUsers.get(code);
+            if (!stillRoom) return;
+            const entry = stillRoom.get(socket.user.id);
+            if (!entry) return;
+            // If the entry's socketId has changed, the user reconnected
+            // and rebound — leave them alone.
+            if (entry.socketId !== oldSocketId) {
+              console.log(`[VoiceDiag] grace eviction skipped — ${socket.user.username} rebound to ${entry.socketId}`);
+              return;
+            }
+            console.log(`[VoiceDiag] grace eviction firing for ${socket.user.username} on ${code} — never reconnected`);
+            handleVoiceLeave(socket, code, { softDisconnect: true });
+          }, 4000);
+          pendingVoiceLeave.set(key, { timer, oldSocketId });
         } else {
           // Owner-mismatch or no entry: still run a prune pass for this room
           // so any other ghost entries (e.g. from a peer whose disconnect

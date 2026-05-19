@@ -120,6 +120,14 @@ class VoiceManager {
     this.socket.on('voice-existing-users', async (data) => {
       // Apply audio bitrate cap from channel settings
       this.audioBitrate = data.voiceBitrate || 0;
+      // Fast-path: server told us this is a transient rejoin and our
+      // existing RTCPeerConnections are still live. Skip creating fresh
+      // peers — that would tear down working audio for no reason. See
+      // [VoiceDiag] fast-path in src/socketHandlers/voice.js.
+      if (data.skipRenegotiate) {
+        console.log('[Voice] voice-existing-users with skipRenegotiate — keeping existing peers');
+        return;
+      }
       for (const user of data.users) {
         await this._createPeer(user.id, user.username, true);
       }

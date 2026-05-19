@@ -855,6 +855,13 @@ _setupSocketListeners() {
     // own entry from local state so the panel never shows us as absent
     // while the voice bar says "Voice Connected". (#self-absent-voice-panel)
     if (isInVoice && myId && !users.some(u => u.id === myId)) {
+      console.warn('[VoiceSelfHeal] Server roster missing self — injecting + emitting voice-rejoin', {
+        channel: data.channelCode,
+        rosterIds: users.map(u => u && u.id),
+        myId,
+        socketId: this.socket?.id,
+        socketConnected: !!this.socket?.connected
+      });
       users = [
         {
           id: myId,
@@ -1718,6 +1725,56 @@ _setupSocketListeners() {
     const gameName = this._gamesRegistry?.find(g => g.id === data.game)?.name || data.game;
     this._showToast(`🏆 ${t('toasts.record_set', { user: this._getNickname(data.user_id, data.username), game: gameName, score: data.score })}`, 'success');
   });
+
+  // ── Voice roster watchdog ───────────────────────────────────────────
+  // The user has repeatedly reported that after a while in voice on the
+  // desktop client, they vanish from BOTH the right voice panel and the
+  // left sidebar voice indicator while peers still see them (and audio
+  // often still works). Every prior fix relied on the server pushing a
+  // fresh `voice-users-update` to trigger the self-heal in that handler,
+  // but if no one else mutes/joins/leaves nothing arrives and the bad
+  // state sticks until the user manually leaves and rejoins.
+  //
+  // This watchdog runs every 10 s while we're in voice and the socket
+  // is connected. It actively pulls a fresh roster from the server
+  // (`request-voice-users`), which causes the server to emit a private
+  // `voice-users-update` back to us. The existing self-heal in that
+  // handler (file `app-socket.js`, search "Self-heal") will then detect
+  // we're missing and emit `voice-rejoin` to rebind our voice slot.
+  //
+  // The interval is also a no-op when we're NOT in voice, so it costs
+  // one tiny socket emit every 10 s in the worst case.
+  if (!this._voiceRosterWatchdog) {
+    this._voiceRosterWatchdog = setInterval(() => {
+      try {
+        if (!this.socket?.connected) return;
+        if (!this.voice || !this.voice.inVoice) return;
+        const code = this.voice.currentChannel;
+        if (!code || !/^[a-f0-9]{8}$/i.test(code)) return;
+        // Check what we last rendered. If we already know we're missing,
+        // log loudly so it's easy to spot in DevTools when the glitch hits.
+        const myId = this.user && this.user.id;
+        const lastUsers = Array.isArray(this._lastVoiceUsers) ? this._lastVoiceUsers : [];
+        const selfPresentLocally = myId && lastUsers.some(u => u && u.id === myId);
+        if (myId && !selfPresentLocally) {
+          console.warn('[VoiceWatchdog] Self ABSENT from local roster while inVoice — polling server', {
+            channel: code,
+            inVoice: this.voice.inVoice,
+            socketConnected: !!this.socket?.connected,
+            lastUserCount: lastUsers.length
+          });
+        } else {
+          // Quiet trace, useful when the user grabs a console dump after a glitch.
+          if (window.HAVEN_DEBUG_VOICE) {
+            console.debug('[VoiceWatchdog] tick', { channel: code, lastUserCount: lastUsers.length });
+          }
+        }
+        this.socket.emit('request-voice-users', { code, iAmInVoice: true });
+      } catch (e) {
+        console.warn('[VoiceWatchdog] tick failed:', e);
+      }
+    }, 10000);
+  }
 },
 
 };
