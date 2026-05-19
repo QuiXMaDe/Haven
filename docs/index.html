@@ -953,13 +953,13 @@
           <span class="discord-feat">🖥️ Windows &amp; Linux</span>
         </div>
         <div style="margin-top: 28px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-          <a href="https://github.com/ancsemi/Haven-Desktop/releases/download/v1.4.14/Haven-Setup-1.4.14.exe" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
+          <a href="https://github.com/ancsemi/Haven-Desktop/releases/download/v1.4.15/Haven-Setup-1.4.15.exe" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
             <span class="icon">⬇</span> Windows Installer
           </a>
-          <a href="https://github.com/ancsemi/Haven-Desktop/releases/download/v1.4.14/Haven-1.4.14.AppImage" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
+          <a href="https://github.com/ancsemi/Haven-Desktop/releases/download/v1.4.15/Haven-1.4.15.AppImage" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
             <span class="icon">⬇</span> Linux AppImage
           </a>
-          <a href="https://github.com/ancsemi/Haven-Desktop/releases/download/v1.4.14/haven-desktop_1.4.14_amd64.deb" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
+          <a href="https://github.com/ancsemi/Haven-Desktop/releases/download/v1.4.15/haven-desktop_1.4.15_amd64.deb" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">
             <span class="icon">⬇</span> Linux .deb
           </a>
         </div>
@@ -1415,12 +1415,12 @@
       </div>
 
       <div class="download-card fade-in">
-        <h2>&#x2B21; Haven Server &mdash; v3.16.13</h2>
+        <h2>&#x2B21; Haven Server &mdash; v3.16.14</h2>
         <p class="download-version">Latest stable release &middot; Windows, macOS &amp; Linux &middot; ~5 MB</p>
 
         <div class="download-btn-group">
-          <a href="https://github.com/ancsemi/Haven/archive/refs/tags/v3.16.13.zip" class="btn btn-primary download-main">
-            <span class="icon">&#x2B07;</span> Download v3.16.13 (.zip)
+          <a href="https://github.com/ancsemi/Haven/archive/refs/tags/v3.16.14.zip" class="btn btn-primary download-main">
+            <span class="icon">&#x2B07;</span> Download v3.16.14 (.zip)
           </a>
           <div class="download-alt-links">
             <a href="https://github.com/ancsemi/Haven" target="_blank">&#9965; View on GitHub</a>
@@ -1437,7 +1437,11 @@
           <div class="version-list">
             <div class="version-list-inner">
               <div class="version-item">
-                <div><span class="v-name">v3.16.13</span><span class="v-tag latest">Latest</span> &mdash; Channel and sub-channel composers are now drag-resizable up to 60% of the viewport (#5327). New sub-channels inherit their parent channel's role access on creation (#5328). Voice chat: deferred soft-leave on transient socket blips so quick reconnects no longer tear down the mic and peers, plus a self-heal that emits voice-rejoin automatically when the right panel notices we&rsquo;ve dropped off the server roster &mdash; no more manual leave+rejoin churn</div>
+                <div><span class="v-name">v3.16.14</span><span class="v-tag latest">Latest</span> &mdash; Voice chat: server-side 4 s grace period before evicting a disconnected user so transient blips never broadcast <code>voice-user-left</code> to peers; fast-path rejoin that skips RTCPeerConnection renegotiation when the socket reconnects within the window; client-side roster watchdog that auto-fires <code>voice-rejoin</code> if we&rsquo;ve silently dropped off the server list &mdash; fixes the recurring self-vanish glitch (#5347)</div>
+                <a href="https://github.com/ancsemi/Haven/archive/refs/tags/v3.16.14.zip">Download &rarr;</a>
+              </div>
+              <div class="version-item">
+                <div><span class="v-name">v3.16.13</span> &mdash; Channel and sub-channel composers are now drag-resizable up to 60% of the viewport (#5327). New sub-channels inherit their parent channel&rsquo;s role access on creation (#5328). Voice chat: deferred soft-leave on transient socket blips so quick reconnects no longer tear down the mic and peers, plus a self-heal that emits voice-rejoin automatically when the right panel notices we&rsquo;ve dropped off the server roster &mdash; no more manual leave+rejoin churn</div>
                 <a href="https://github.com/ancsemi/Haven/archive/refs/tags/v3.16.13.zip">Download &rarr;</a>
               </div>
               <div class="version-item">
@@ -2000,12 +2004,12 @@
       <!-- Desktop App Download Card -->
       <div class="download-card fade-in" style="margin-top: 32px; border-color: rgba(250, 166, 26, 0.25);">
         <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent-dim), var(--warning), var(--green)); box-shadow: 0 0 12px rgba(250, 166, 26, 0.3);"></div>
-        <h2>🖥️ Haven Desktop <span class="beta-badge-inline">BETA</span> &mdash; v1.4.11</h2>
+        <h2>🖥️ Haven Desktop <span class="beta-badge-inline">BETA</span> &mdash; v1.4.15</h2>
         <p class="download-version">Latest beta release &middot; Windows &amp; Linux &middot; Standalone installer</p>
 
         <div class="download-btn-group">
           <a href="https://github.com/ancsemi/Haven-Desktop/releases/latest" class="btn btn-primary download-main" style="background: var(--warning); box-shadow: 0 4px 24px rgba(250, 166, 26, 0.25), 0 0 0 1px rgba(250, 166, 26, 0.3);">
-            <span class="icon">⬇</span> Download Desktop v1.4.11
+            <span class="icon">⬇</span> Download Desktop v1.4.15
           </a>
           <div class="download-alt-links">
             <a href="https://github.com/ancsemi/Haven-Desktop" target="_blank">&#9965; View on GitHub</a>

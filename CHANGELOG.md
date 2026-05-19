@@ -11,7 +11,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Haven uses [Sema
 
 ---
 
-## [Unreleased]
+## [3.16.14] — 2026-05-19
 
 ### Fixed
 - **Voice chat: recurring "I vanished from my own voice panel even though I can still talk" glitch (#5347, again).** Previous patches added a soft-leave deferral and a passive self-inject in `voice-users-update`, but neither fixed the underlying cause: the server's `disconnect` handler was eagerly removing the user from `voiceUsers` on every blip and broadcasting `voice-user-left` to peers. On the common transient case (Electron renderer briefly suspends, NAT rebind, brief Wi-Fi hiccup) the user reconnected within a second or two, but by then peers had already torn down their `RTCPeerConnection`s — or worse, the server's roster was empty and the rejoin never fully repaired the local UI, so the user kept seeing only other people in the voice panel while their own mic still worked. This release stops the bleeding at the source:
