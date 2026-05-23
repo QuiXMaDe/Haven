@@ -3417,7 +3417,7 @@ html.rgb-cycling *::after {
    through behind the messages.                        */
 .dm-pip-panel {
   position: fixed;
-  z-index: 1010;
+  z-index: 99999;
   display: none;
   flex-direction: column;
   background: var(--bg-primary, #1e1e1e);
@@ -7763,7 +7763,9 @@ html:not([data-toolbaricons="emoji"]):not([data-toolbaricons="color"]) .tb-icon-
   border-radius: 12px;
   resize: both;
   overflow: hidden;
-  z-index: 10020;
+  /* Must sit above .message-input-area (z:99995) — same reason the docked
+     thread panel was bumped to 99996. (#5373) */
+  z-index: 99999;
 }
 .thread-panel.pip .thread-panel-resizer {
   display: none;

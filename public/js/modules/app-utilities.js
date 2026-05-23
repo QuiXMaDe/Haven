@@ -1222,8 +1222,8 @@ _toggleEmojiPicker(anchorEl) {
   // Anchor-based positioning: used when opening from PiP or thread input buttons.
   // Move the picker to document.body so it escapes any overflow clipping context,
   // then position it with fixed coords above the anchor button. Boost z-index so
-  // it renders above the dm-pip-panel (z-index 950) and pip-mode thread-panel
-  // (z-index 10020).
+  // it renders above the dm-pip-panel (z-index 99999) and pip-mode thread-panel
+  // (z-index 99999).
   if (anchorEl) {
     if (picker.parentElement !== document.body) {
       picker._havenOrigParent = picker.parentElement;
@@ -2336,7 +2336,8 @@ _openDMPiP(code) {
       const s = onlinePartner.status;
       statusClass = s === 'dnd' ? 'dnd'
         : s === 'away' ? 'away'
-        : s === 'invisible' ? 'invisible' : '';
+        : s === 'invisible' ? 'invisible'
+        : (onlinePartner.online === false ? 'away' : '');
     } else {
       statusClass = 'away'; // partner not in online list → treat as offline/away
     }
