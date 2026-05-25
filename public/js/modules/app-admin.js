@@ -545,7 +545,8 @@ _syncSettingsNav() {
   const canManageSounds = isAdmin || this._hasPerm('manage_soundboard');
   const canManageRoles = isAdmin || this._hasPerm('manage_roles');
   const canManageServer = isAdmin || this._hasPerm('manage_server');
-  const hasAnyAdminAccess = isAdmin || canManageEmojis || canManageStickers || canManageSounds || canManageRoles || canManageServer;
+  const canManageWebhooks = isAdmin || this._hasPerm('manage_webhooks');
+  const hasAnyAdminAccess = isAdmin || canManageEmojis || canManageStickers || canManageSounds || canManageRoles || canManageServer || canManageWebhooks;
 
   // Show/hide individual admin nav items (default: hidden for non-admins)
   document.querySelectorAll('.settings-nav-admin').forEach(el => {
@@ -614,6 +615,11 @@ _syncSettingsNav() {
       if (navItem) navItem.style.display = '';
     });
   }
+  // Show Bots tab for users with manage_webhooks permission
+  const botsNavItem = document.querySelector('.settings-nav-item[data-target="section-bots"]');
+  if (botsNavItem && !isAdmin && canManageWebhooks) {
+    botsNavItem.style.display = '';
+  }
   // Show Audit Log nav item for users with view_audit_log permission
   const canViewAuditLog = isAdmin || this._hasPerm('view_audit_log');
   const auditNavItem = document.querySelector('.settings-nav-item[data-target="section-audit-log"]');
@@ -657,7 +663,7 @@ _snapshotAdminSettings() {
   const tosEl = document.getElementById('custom-tos-input');
   if (tosEl) tosEl.value = this._adminSnapshot.custom_tos;
   // Load webhooks list for admin preview
-  if (this.user?.isAdmin) {
+  if (this.user?.isAdmin || this._hasPerm('manage_webhooks')) {
     this.socket.emit('get-webhooks');
   }
 },

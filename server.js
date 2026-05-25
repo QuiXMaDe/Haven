@@ -503,10 +503,12 @@ app.post('/api/upload-webhook-avatar', uploadLimiter, (req, res) => {
   const user = token ? verifyToken(token) : null;
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-  // Only admins can manage webhooks
+  // Admins or users with manage_webhooks permission can upload webhook avatars
   const { getDb } = require('./src/database');
   const dbUser = getDb().prepare('SELECT is_admin FROM users WHERE id = ?').get(user.id);
-  if (!dbUser || !dbUser.is_admin) return res.status(403).json({ error: 'Admin only' });
+  if (!dbUser || (!dbUser.is_admin && !userHasPermission(user.id, 'manage_webhooks'))) {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
 
   upload.single('avatar')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message });
