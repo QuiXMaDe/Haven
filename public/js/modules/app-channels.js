@@ -63,7 +63,10 @@ async switchChannel(code) {
       const _scJoinBtn = document.getElementById('voice-join-btn');
       if (_scJoinBtn) _scJoinBtn.style.display = (channel && channel.voice_enabled === 0) || !_canVoice ? 'none' : 'inline-flex';
       const mobileJoin = document.getElementById('voice-join-mobile');
-      if (mobileJoin) mobileJoin.style.display = (channel && channel.voice_enabled === 0) || !_canVoice ? 'none' : '';
+      if (mobileJoin) {
+        if ((channel && channel.voice_enabled === 0) || !_canVoice) mobileJoin.style.setProperty('display', 'none', 'important');
+        else mobileJoin.style.removeProperty('display');
+      }
     }
   } else {
     // Show just the join button (not the indicator), but hide it for text-only channels or users without voice permission
@@ -75,7 +78,10 @@ async switchChannel(code) {
     const vp = document.getElementById('voice-panel');
     if (vp) vp.style.display = 'none';
     const mobileJoin = document.getElementById('voice-join-mobile');
-    if (mobileJoin) mobileJoin.style.display = (channel && channel.voice_enabled === 0) || !_canVoice ? 'none' : '';
+    if (mobileJoin) {
+      if ((channel && channel.voice_enabled === 0) || !_canVoice) mobileJoin.style.setProperty('display', 'none', 'important');
+      else mobileJoin.style.removeProperty('display');
+    }
   }
   document.getElementById('search-toggle-btn').style.display = '';
   document.getElementById('pinned-toggle-btn').style.display = '';
@@ -310,7 +316,7 @@ _showWelcome() {
   const vp2 = document.getElementById('voice-panel');
   if (vp2) vp2.style.display = 'none';
   const mobileJoin = document.getElementById('voice-join-mobile');
-  if (mobileJoin) mobileJoin.style.display = 'none';
+  if (mobileJoin) mobileJoin.style.setProperty('display', 'none', 'important');
   const actionsBox = document.getElementById('header-actions-box');
   if (actionsBox) actionsBox.style.display = 'none';
   document.getElementById('status-channel').textContent = t('channels.status_none');

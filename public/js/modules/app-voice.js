@@ -234,8 +234,14 @@ _updateVoiceButtons(inVoice) {
   if (sidebarDeafen) sidebarDeafen.style.display = (inVoice && useSidebar) ? '' : 'none';
 
   // Mobile voice join in right sidebar
+  // NOTE: must use setProperty('display', ..., 'important') because the mobile CSS
+  // rule .mobile-voice-join { display: flex !important; } would otherwise win and
+  // keep the button visible while already in voice (#5387).
   const mobileJoin = document.getElementById('voice-join-mobile');
-  if (mobileJoin) mobileJoin.style.display = inVoice ? 'none' : '';
+  if (mobileJoin) {
+    if (inVoice) mobileJoin.style.setProperty('display', 'none', 'important');
+    else mobileJoin.style.removeProperty('display');
+  }
 
   if (!inVoice) {
     // Reset all mute/deafen buttons (sidebar + header)
