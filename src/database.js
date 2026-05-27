@@ -412,6 +412,15 @@ function initDatabase() {
     try { db.prepare(`SELECT ${col.name} FROM channels LIMIT 0`).get(); } catch { db.exec(col.sql); }
   }
 
+  // ── Migration: per-channel default role (#5389) ──────────
+  // When set, every existing and future member of this channel is granted
+  // this role scoped to this channel via user_roles. NULL = no auto-grant.
+  try {
+    db.prepare("SELECT default_role_id FROM channels LIMIT 0").get();
+  } catch {
+    db.exec("ALTER TABLE channels ADD COLUMN default_role_id INTEGER DEFAULT NULL REFERENCES roles(id) ON DELETE SET NULL");
+  }
+
   // ── Migration: sub-channels (parent_channel_id, position) ──
   try {
     db.prepare("SELECT parent_channel_id FROM channels LIMIT 0").get();

@@ -14,6 +14,24 @@ module.exports = function register(socket, ctx) {
   const { channelUsers, voiceUsers, activeMusic, musicQueues } = state;
   const _audit = (typeof logAudit === 'function') ? logAudit : () => {};
 
+  // (#5389) Auto-grant a channel's default_role_id to a user when they join
+  // or are added to that channel. No-op if the channel has no default role.
+  // Safe to call repeatedly — INSERT OR IGNORE avoids duplicates.
+  const _applyChannelDefaultRole = (channelId, userId, grantedBy = null) => {
+    try {
+      const row = db.prepare('SELECT default_role_id FROM channels WHERE id = ?').get(channelId);
+      if (!row || !row.default_role_id) return;
+      db.prepare(
+        'INSERT OR IGNORE INTO user_roles (user_id, role_id, channel_id, granted_by) VALUES (?, ?, ?, ?)'
+      ).run(userId, row.default_role_id, channelId, grantedBy);
+      if (typeof applyRoleChannelAccess === 'function') {
+        try { applyRoleChannelAccess(row.default_role_id, userId, 'grant'); } catch { /* non-critical */ }
+      }
+    } catch (e) {
+      console.warn('applyChannelDefaultRole failed:', e.message);
+    }
+  };
+
   // ── Get user's channels ─────────────────────────────────
   socket.on('get-channels', () => {
     const channels = getEnrichedChannels(
@@ -211,11 +229,13 @@ module.exports = function register(socket, ctx) {
     const _doAutoJoin = () => {
       const { parents, allowSet } = _resolveAutoJoinChannels();
       const insertMember = db.prepare('INSERT OR IGNORE INTO channel_members (channel_id, user_id) VALUES (?, ?)');
+      const joinedChannelIds = [];
       let joinedCount = 0;
       const txn = db.transaction(() => {
         for (const parent of parents) {
           insertMember.run(parent.id, socket.user.id);
           socket.join(`channel:${parent.code}`);
+          joinedChannelIds.push(parent.id);
           joinedCount++;
           // Sub-channels: never grant private subs via invite. When a
           // default-channels allowlist is set, only grant subs whose
@@ -224,11 +244,14 @@ module.exports = function register(socket, ctx) {
           for (const sub of subs) {
             insertMember.run(sub.id, socket.user.id);
             socket.join(`channel:${sub.code}`);
+            joinedChannelIds.push(sub.id);
             joinedCount++;
           }
         }
       });
       txn();
+      // (#5389) Apply each channel's default role after membership is settled.
+      for (const chId of joinedChannelIds) _applyChannelDefaultRole(chId, socket.user.id);
       return joinedCount;
     };
 
@@ -288,6 +311,9 @@ module.exports = function register(socket, ctx) {
           applyRoleChannelAccess(ar.id, socket.user.id, 'grant');
         }
       } catch { /* non-critical */ }
+
+      // (#5389) Per-channel default role auto-grant.
+      _applyChannelDefaultRole(channel.id, socket.user.id);
     }
 
     if (!channel.parent_channel_id) {
@@ -298,6 +324,7 @@ module.exports = function register(socket, ctx) {
       subs.forEach(sub => {
         insertSub.run(sub.id, socket.user.id);
         socket.join(`channel:${sub.code}`);
+        _applyChannelDefaultRole(sub.id, socket.user.id);
       });
     }
 
@@ -702,6 +729,64 @@ module.exports = function register(socket, ctx) {
     } catch (err) {
       console.error('Set slow mode error:', err);
       socket.emit('error-msg', 'Failed to set slow mode');
+    }
+  });
+
+  // (#5389) Per-channel default role. Setting it auto-grants the role
+  // (channel-scoped) to every existing member and every future joiner.
+  // Clearing it (roleId = null/0) leaves existing grants alone — admins can
+  // revoke from the Roles UI if they want to strip them.
+  socket.on('set-channel-default-role', (data) => {
+    if (!data || typeof data !== 'object') return;
+    if (!socket.user.isAdmin && !userHasPermission(socket.user.id, 'manage_roles')) {
+      return socket.emit('error-msg', 'You don\'t have permission to set a default role');
+    }
+    const code = typeof data.code === 'string' ? data.code.trim() : '';
+    if (!code || !/^[a-f0-9]{8}$/i.test(code)) return;
+    const channel = db.prepare('SELECT id FROM channels WHERE code = ? AND is_dm = 0').get(code);
+    if (!channel) return socket.emit('error-msg', 'Channel not found');
+
+    let roleId = null;
+    if (data.roleId !== null && data.roleId !== undefined && data.roleId !== 0 && data.roleId !== '') {
+      const parsed = parseInt(data.roleId, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return socket.emit('error-msg', 'Invalid role');
+      }
+      const role = db.prepare('SELECT id, name FROM roles WHERE id = ?').get(parsed);
+      if (!role) return socket.emit('error-msg', 'Role not found');
+      roleId = role.id;
+    }
+
+    try {
+      db.prepare('UPDATE channels SET default_role_id = ? WHERE id = ?').run(roleId, channel.id);
+
+      if (roleId) {
+        // Backfill: grant the new default to every current member of this
+        // channel. INSERT OR IGNORE protects against duplicates if any
+        // member already holds the role channel-scoped.
+        const members = db.prepare('SELECT user_id FROM channel_members WHERE channel_id = ?').all(channel.id);
+        const insertRole = db.prepare(
+          'INSERT OR IGNORE INTO user_roles (user_id, role_id, channel_id, granted_by) VALUES (?, ?, ?, ?)'
+        );
+        const txn = db.transaction(() => {
+          for (const m of members) insertRole.run(m.user_id, roleId, channel.id, socket.user.id);
+        });
+        txn();
+        if (typeof applyRoleChannelAccess === 'function') {
+          for (const m of members) {
+            try { applyRoleChannelAccess(roleId, m.user_id, 'grant'); } catch { /* non-critical */ }
+          }
+        }
+      }
+
+      broadcastChannelLists();
+      io.to(`channel:${code}`).emit('channel-default-role-updated', { code, roleId });
+      socket.emit('toast', { message: roleId ? 'Default role set' : 'Default role cleared', type: 'success' });
+      _audit({ actor: socket.user, action: 'channel_default_role_set',
+        target_type: 'channel', target_id: channel.id, details: { code, roleId } });
+    } catch (err) {
+      console.error('Set default role error:', err);
+      socket.emit('error-msg', 'Failed to set default role');
     }
   });
 

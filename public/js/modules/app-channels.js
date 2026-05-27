@@ -496,6 +496,18 @@ _updateChannelFunctionsPanel(ch) {
   // Announcement channel
   const isAnnouncement = ch.notification_type === 'announcement';
   this._setCfnBadge('announcement', isAnnouncement, isAnnouncement ? 'ON' : 'OFF');
+  // (#5389) Default role badge — show role name when set, else "None".
+  // Hide for DMs since DMs have no role concept.
+  const defaultRoleRow = document.querySelector('.cfn-row[data-fn="default-role"]');
+  if (defaultRoleRow) {
+    defaultRoleRow.style.display = ch.is_dm ? 'none' : '';
+    if (!ch.is_dm) {
+      const drId = ch.default_role_id || null;
+      const role = drId && Array.isArray(this._allRoles)
+        ? this._allRoles.find(r => r.id === drId) : null;
+      this._setCfnBadge('default-role', !!drId, role ? role.name : (drId ? `#${drId}` : 'None'));
+    }
+  }
   // Self Destruct timer
   const hasExpiry = !!ch.expires_at;
   if (hasExpiry) {

@@ -460,6 +460,53 @@ _setupUI() {
       const newType = isAnnouncement ? 'default' : 'announcement';
       optimistic({ notification_type: newType });
       this.socket.emit('set-notification-type', { code, type: newType });
+    } else if (fn === 'default-role') {
+      // (#5389) Dropdown of available server roles. Selecting one fires
+      // set-channel-default-role; selecting "None" clears the default.
+      if (row.querySelector('.cfn-select')) return;
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge) return;
+      // Lazy-fetch roles if we haven't yet (e.g. admin opened the panel
+      // before visiting the Roles page).
+      const _open = () => {
+        const roles = Array.isArray(this._allRoles) ? this._allRoles : [];
+        const select = document.createElement('select');
+        select.className = 'cfn-select cfn-input';
+        select.onclick = e2 => e2.stopPropagation();
+        const noneOpt = document.createElement('option');
+        noneOpt.value = ''; noneOpt.textContent = 'None';
+        select.appendChild(noneOpt);
+        for (const r of roles) {
+          const opt = document.createElement('option');
+          opt.value = String(r.id);
+          opt.textContent = r.name;
+          if (ch && r.id === ch.default_role_id) opt.selected = true;
+          select.appendChild(opt);
+        }
+        badge.replaceWith(select);
+        select.focus();
+        let committed = false;
+        const commit = () => {
+          if (committed) return;
+          committed = true;
+          const raw = select.value;
+          const roleId = raw ? parseInt(raw, 10) : null;
+          optimistic({ default_role_id: roleId });
+          this.socket.emit('set-channel-default-role', { code, roleId });
+        };
+        select.addEventListener('change', () => { commit(); select.blur(); });
+        select.addEventListener('blur', () => {
+          if (!committed) this._updateChannelFunctionsPanel(ch);
+        });
+      };
+      if (Array.isArray(this._allRoles) && this._allRoles.length) {
+        _open();
+      } else {
+        this.socket.emit('get-roles', {}, (res) => {
+          if (res && Array.isArray(res.roles)) this._allRoles = res.roles;
+          _open();
+        });
+      }
     } else if (fn === 'user-limit') {
       // If an input is already showing, don't open another
       if (row.querySelector('.cfn-input')) return;
